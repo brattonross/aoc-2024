@@ -12,6 +12,7 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     try stdout.print("part 1: {}\n", .{try part_1(allocator, data)});
+    try stdout.print("part 2: {}\n", .{try part_2(allocator, data)});
 }
 
 fn part_1(allocator: Allocator, input: []const u8) !usize {
@@ -42,17 +43,53 @@ fn part_1(allocator: Allocator, input: []const u8) !usize {
     return total;
 }
 
+const test_input =
+    \\3   4
+    \\4   3
+    \\2   5
+    \\1   3
+    \\3   9
+    \\3   3
+;
 test "part 1" {
-    const input =
-        \\3   4
-        \\4   3
-        \\2   5
-        \\1   3
-        \\3   9
-        \\3   3
-    ;
-    const actual = try part_1(std.testing.allocator, input);
+    const actual = try part_1(std.testing.allocator, test_input);
     try std.testing.expectEqual(11, actual);
+}
+
+fn part_2(allocator: Allocator, input: []const u8) !usize {
+    var left_map = std.AutoArrayHashMap(usize, usize).init(allocator);
+    defer left_map.deinit();
+
+    var right_map = std.AutoArrayHashMap(usize, usize).init(allocator);
+    defer right_map.deinit();
+
+    var lines = std.mem.splitScalar(u8, input, '\n');
+    while (lines.next()) |line| {
+        if (line.len == 0) continue;
+        const first_space_idx = std.mem.indexOfScalar(u8, line, ' ') orelse unreachable;
+
+        const left = try std.fmt.parseInt(usize, line[0..first_space_idx], 10);
+        const left_total = left_map.get(left) orelse 0;
+        try left_map.put(left, left_total + 1);
+
+        const right = try std.fmt.parseInt(usize, std.mem.trimLeft(u8, line[first_space_idx + 1 ..], " "), 10);
+        const right_total = right_map.get(right) orelse 0;
+        try right_map.put(right, right_total + 1);
+    }
+
+    var total: usize = 0;
+    var iter = left_map.iterator();
+    while (iter.next()) |entry| {
+        const key = entry.key_ptr.*;
+        const right = right_map.get(key) orelse 0;
+        total += key * right * entry.value_ptr.*;
+    }
+    return total;
+}
+
+test "part 2" {
+    const actual = try part_2(std.testing.allocator, test_input);
+    try std.testing.expectEqual(31, actual);
 }
 
 /// Linked list that maintains `usize` values in a sorted (asc) order.
