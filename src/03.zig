@@ -6,6 +6,7 @@ pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
 
     try stdout.print("part 1: {}\n", .{part_1(data)});
+    try stdout.print("part 2: {}\n", .{part_2(data)});
 }
 
 fn part_1(input: []const u8) usize {
@@ -17,23 +18,43 @@ fn part_1(input: []const u8) usize {
     return total;
 }
 
+fn part_2(input: []const u8) usize {
+    var total: usize = 0;
+    var iter = MulIterator.init(input);
+    while (iter.nextEnabled()) |mul| {
+        total += mul.left * mul.right;
+    }
+    return total;
+}
+
 const Mul = struct { left: usize, right: usize };
 const MulIterator = struct {
     buffer: []const u8,
     pos: usize,
+    enabled: bool,
 
     pub fn init(buffer: []const u8) MulIterator {
-        return .{ .buffer = buffer, .pos = 0 };
+        return .{ .buffer = buffer, .pos = 0, .enabled = true };
     }
 
     pub fn next(self: *MulIterator) ?Mul {
-        while (true) {
-            const curr = self.current() orelse return null;
+        while (self.current()) |curr| {
             switch (curr) {
+                'd' => if (self.readConditional()) |enabled| {
+                    self.enabled = enabled;
+                },
                 'm' => if (self.readMul()) |mul| return mul else {},
                 else => self.advance(),
             }
         }
+        return null;
+    }
+
+    pub fn nextEnabled(self: *MulIterator) ?Mul {
+        while (self.next()) |mul| {
+            if (self.enabled) return mul;
+        }
+        return null;
     }
 
     fn advanceIf(self: *MulIterator, expected: u8) bool {
@@ -100,10 +121,38 @@ const MulIterator = struct {
     fn isDigit(value: u8) bool {
         return value >= '0' and value <= '9';
     }
+
+    fn readConditional(self: *MulIterator) ?bool {
+        if (!self.advanceIf('d')) return null;
+        if (!self.advanceIf('o')) return null;
+        const curr = self.current() orelse return null;
+        switch (curr) {
+            '(' => {
+                self.advance();
+                if (!self.advanceIf(')')) return null;
+                return true;
+            },
+            'n' => {
+                self.advance();
+                if (!self.advanceIf('\'')) return null;
+                if (!self.advanceIf('t')) return null;
+                if (!self.advanceIf('(')) return null;
+                if (!self.advanceIf(')')) return null;
+                return false;
+            },
+            else => return null,
+        }
+    }
 };
 
 test "part 1" {
     const input = "xmul(2,4)%&mul[3,7]!@^do_not_mul(5,5)+mul(32,64]then(mul(11,8)mul(8,5))";
     const actual = part_1(input);
     try std.testing.expectEqual(161, actual);
+}
+
+test "part 2" {
+    const input = "xmul(2,4)&mul[3,7]!^don't()_mul(5,5)+mul(32,64](mul(11,8)undo()?mul(8,5))";
+    const actual = part_2(input);
+    try std.testing.expectEqual(48, actual);
 }
