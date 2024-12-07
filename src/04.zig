@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 const data = @embedFile("./04.input");
 
@@ -6,7 +7,7 @@ pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
 
     try stdout.print("part 1: {}\n", .{try part_1(data)});
-    // try stdout.print("part 2: {}\n", .{part_2(data)});
+    try stdout.print("part 2: {}\n", .{try part_2(data)});
 }
 
 fn part_1(input: []const u8) !usize {
@@ -14,15 +15,8 @@ fn part_1(input: []const u8) !usize {
     defer _ = gpa.deinit();
 
     const allocator = gpa.allocator();
-
-    var grid = std.ArrayList([]const u8).init(allocator);
+    var grid = try buildGrid(allocator, input);
     defer grid.deinit();
-
-    var iter = std.mem.splitScalar(u8, input, '\n');
-    while (iter.next()) |line| {
-        if (line.len == 0) continue;
-        try grid.append(line);
-    }
 
     var total: usize = 0;
     for (grid.items, 0..) |line, row| {
@@ -79,4 +73,67 @@ test "part 1" {
     ;
     const actual = try part_1(input);
     try std.testing.expectEqual(18, actual);
+}
+
+fn part_2(input: []const u8) !usize {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    const allocator = gpa.allocator();
+    var grid = try buildGrid(allocator, input);
+    defer grid.deinit();
+
+    var total: usize = 0;
+    for (grid.items, 0..) |line, row| {
+        for (0..line.len) |col| {
+            total += isXmas(grid.items, row, col);
+        }
+    }
+    return total;
+}
+
+fn isXmas(grid: [][]const u8, row: usize, col: usize) usize {
+    if (row < 1 or row > grid.len - 2 or col < 1 or col > grid[0].len - 2 or grid[row][col] != 'A') return 0;
+
+    const nw = grid[row - 1][col - 1];
+    const ne = grid[row - 1][col + 1];
+    const se = grid[row + 1][col + 1];
+    const sw = grid[row + 1][col - 1];
+
+    if (!isMS(nw) or !isMS(ne) or !isMS(se) or !isMS(sw)) return 0;
+    if (nw == se or ne == sw) return 0;
+
+    return 1;
+}
+
+fn isMS(c: u8) bool {
+    return c == 'M' or c == 'S';
+}
+
+test "part 2" {
+    const input =
+        \\MMMSXXMASM
+        \\MSAMXMSMSA
+        \\AMXSXMAAMM
+        \\MSAMASMSMX
+        \\XMASAMXAMM
+        \\XXAMMXXAMA
+        \\SMSMSASXSS
+        \\SAXAMASAAA
+        \\MAMMMXMMMM
+        \\MXMXAXMASX   
+    ;
+    const actual = try part_2(input);
+    try std.testing.expectEqual(9, actual);
+}
+
+// foo
+fn buildGrid(allocator: Allocator, input: []const u8) !std.ArrayList([]const u8) {
+    var grid = std.ArrayList([]const u8).init(allocator);
+    var iter = std.mem.splitScalar(u8, input, '\n');
+    while (iter.next()) |line| {
+        if (line.len == 0) continue;
+        try grid.append(line);
+    }
+    return grid;
 }
