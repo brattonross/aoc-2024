@@ -7,7 +7,7 @@ pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
 
     try stdout.print("part 1: {}\n", .{try part_1(data)});
-    // try stdout.print("part 2: {}\n", .{try part_2(data)});
+    try stdout.print("part 2: {}\n", .{try part_2(data)});
 }
 
 fn part_1(input: []const u8) !usize {
@@ -81,6 +81,89 @@ test "part 1" {
     ;
     const actual = try part_1(input);
     try std.testing.expectEqual(143, actual);
+}
+
+fn part_2(input: []const u8) !usize {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    const allocator = gpa.allocator();
+    var graph = DirectedGraph.init(allocator);
+    defer graph.deinit();
+
+    var lines = std.mem.splitScalar(u8, input, '\n');
+    while (lines.next()) |line| {
+        if (line.len == 0) break;
+
+        const pipe_index = std.mem.indexOfScalar(u8, line, '|') orelse unreachable;
+        const from = try std.fmt.parseInt(usize, line[0..pipe_index], 10);
+        const to = try std.fmt.parseInt(usize, line[pipe_index + 1 ..], 10);
+        try graph.add(from, to);
+    }
+
+    var total: usize = 0;
+    while (lines.next()) |line| {
+        if (line.len == 0) break;
+
+        var list = std.ArrayList(usize).init(allocator);
+        defer list.deinit();
+
+        var nums = std.mem.splitScalar(u8, line, ',');
+        while (nums.next()) |num| {
+            const n = try std.fmt.parseInt(usize, num, 10);
+            try list.append(n);
+        }
+
+        if (graph.canTraverse(list.items)) {
+            continue;
+        }
+
+        std.mem.sort(usize, list.items, graph, sort);
+        total += list.items[list.items.len / 2];
+    }
+    return total;
+}
+
+/// Returns a bool indicating if left is less than right.
+/// In this case, that means "can the node with value `left` NOT visit the node with value `right`".
+fn sort(graph: DirectedGraph, left: usize, right: usize) bool {
+    const left_node = graph.get(left) orelse std.debug.panic("unknown node {}", .{left});
+    return !left_node.canVisit(right);
+}
+
+test "part 2" {
+    const input =
+        \\47|53
+        \\97|13
+        \\97|61
+        \\97|47
+        \\75|29
+        \\61|13
+        \\75|53
+        \\29|13
+        \\97|29
+        \\53|29
+        \\61|53
+        \\97|53
+        \\61|29
+        \\47|13
+        \\75|47
+        \\97|75
+        \\47|61
+        \\75|61
+        \\47|29
+        \\75|13
+        \\53|13
+        \\
+        \\75,47,61,53,29
+        \\97,61,53,29,13
+        \\75,29,13
+        \\75,97,47,61,53
+        \\61,13,29
+        \\97,13,75,29,47
+    ;
+    const actual = try part_2(input);
+    try std.testing.expectEqual(123, actual);
 }
 
 const DirectedGraph = struct {
